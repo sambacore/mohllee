@@ -773,7 +773,7 @@ function weaponKey(i) { return ['pistol','smg','shotgun','rpg'][i-1] || 'pistol'
 // Crowbar = weapon 0, no ammo. Pistol = 1. SMG = 2. Shotgun = 3. RPG = 4.
 
 const MOVE = {
-  maxSpeed: 320,           // u/s — Quake stock
+  maxSpeed: 240,           // u/s — tight facility; Quake stock is 320 but we have small rooms
   accelerate: 10,
   airAccelerate: 10,
   friction: 4,
@@ -792,8 +792,6 @@ function collideMove(pos, vel, dt) {
   // Treat player as a vertical capsule: snap to nearest ground + axis pushout on X/Z
   // We do a swept axis test: predict next position, resolve per axis if it entered any box.
   const r = player.radius, h = player.height * (player.duck ? MOVE.duckSpeed : 1);
-  const min = [pos.x - r, pos.y, pos.z - r];
-  const max = [pos.x + r, pos.y + h, pos.z + r];
 
   function overlap(a, b) {
     if (a.max[0] < b.min[0] || a.min[0] > b.max[0]) return false;
@@ -802,49 +800,59 @@ function collideMove(pos, vel, dt) {
     return true;
   }
 
-  const next = pos.clone().addScaledVector(vel, dt);
-  const nextMin = [next.x - r, next.y, next.z - r];
-  const nextMax = [next.x + r, next.y + h, next.z + r];
+  // Sub-stepping: cap each sub-step displacement so we never tunnel through a wall.
+  // Walls are 0.4u thick + player radius 0.35 = ~0.75u safe step. Use 0.4u for margin.
+  const maxStep = 0.4;
+  const totalSpeed = Math.hypot(vel.x, vel.y, vel.z);
+  const subSteps = Math.max(1, Math.ceil(totalSpeed * dt / maxStep));
+  const subDt = dt / subSteps;
 
-  // Resolve in axis order — short axis dependency, fine for our box sizes
-  function resolveAxis(axis) {
-    const bit = axis === 0 ? 0b001 : axis === 1 ? 0b010 : 0b100;
-    for (const c of colliders) {
-      if (!(c.axisMask & bit)) continue;
-      if (!overlap({ min: nextMin, max: nextMax }, c)) continue;
-      if (axis === 0) {       // X
-        if (vel.x > 0.001) {
-          nextMax[0] = c.min[0]; pos.x = c.min[0] - r - 0.001;
-        } else if (vel.x < -0.001) {
-          nextMin[0] = c.max[0]; pos.x = c.max[0] + r + 0.001;
+  const next = pos.clone();
+  for (let s = 0; s < subSteps; s++) {
+    // Predict next position
+    const tryX = next.x + vel.x * subDt;
+    const tryY = next.y + vel.y * subDt;
+    const tryZ = next.z + vel.z * subDt;
+    const nextMin = [tryX - r, tryY, tryZ - r];
+    const nextMax = [tryX + r, tryY + h, tryZ + r];
+
+    // Resolve in axis order — short axis dependency, fine for our box sizes
+    function resolveAxis(axis, posRef) {
+      const bit = axis === 0 ? 0b001 : axis === 1 ? 0b010 : 0b100;
+      for (const c of colliders) {
+        if (!(c.axisMask & bit)) continue;
+        if (!overlap({ min: nextMin, max: nextMax }, c)) continue;
+        if (axis === 0) {       // X
+          if (vel.x > 0.001) {
+            nextMax[0] = c.min[0]; posRef.x = c.min[0] - r - 0.001;
+          } else if (vel.x < -0.001) {
+            nextMin[0] = c.max[0]; posRef.x = c.max[0] + r + 0.001;
+          }
+          // else: player is not moving on X — leave X alone. The Y resolver handles
+          // vertical landings (e.g. landing on the ground slab) without shoving the
+          // player out of bounds horizontally.
+          vel.x = 0;
+          nextMin[0] = posRef.x - r; nextMax[0] = posRef.x + r;
+        } else if (axis === 1) { // Y
+          if (vel.y > 0) nextMax[1] = c.min[1]; else { nextMin[1] = c.max[1]; player.onGround = true; }
+          vel.y = 0;
+          posRef.y = (player.onGround) ? c.max[1] : c.min[1] - h - 0.001;
+          nextMin[1] = posRef.y; nextMax[1] = posRef.y + h;
+        } else {                  // Z
+          if (vel.z > 0.001) {
+            nextMax[2] = c.min[2]; posRef.z = c.min[2] - r - 0.001;
+          } else if (vel.z < -0.001) {
+            nextMin[2] = c.max[2]; posRef.z = c.max[2] + r + 0.001;
+          }
+          vel.z = 0;
+          nextMin[2] = posRef.z - r; nextMax[2] = posRef.z + r;
         }
-        // else: player is not moving on X — leave X alone. The Y resolver handles
-        // vertical landings (e.g. landing on the ground slab) without shoving the
-        // player out of bounds horizontally.
-        vel.x = 0;
-        next.x = pos.x;
-        nextMin[0] = pos.x - r; nextMax[0] = pos.x + r;
-      } else if (axis === 1) { // Y
-        if (vel.y > 0) nextMax[1] = c.min[1]; else { nextMin[1] = c.max[1]; player.onGround = true; }
-        vel.y = 0;
-        pos.y = (player.onGround) ? c.max[1] : c.min[1] - h - 0.001;
-        next.y = pos.y;
-        nextMin[1] = pos.y; nextMax[1] = pos.y + h;
-      } else {                  // Z
-        if (vel.z > 0.001) {
-          nextMax[2] = c.min[2]; pos.z = c.min[2] - r - 0.001;
-        } else if (vel.z < -0.001) {
-          nextMin[2] = c.max[2]; pos.z = c.max[2] + r + 0.001;
-        }
-        vel.z = 0;
-        next.z = pos.z;
-        nextMin[2] = pos.z - r; nextMax[2] = pos.z + r;
       }
     }
+    resolveAxis(0, next);
+    resolveAxis(2, next);
+    resolveAxis(1, next);
   }
-  resolveAxis(0);
-  resolveAxis(2);
-  resolveAxis(1);
   return next;
 }
 
@@ -877,7 +885,7 @@ function quakeMove(dt, input) {
 
   let maxSpeed = MOVE.maxSpeed;
   if (input.duck) maxSpeed *= MOVE.maxSpeedDuckMul;
-  if (input.sprint) maxSpeed *= 1.25;
+  if (input.sprint) maxSpeed *= 1.4;
   // Quake-style: wishSpeed is a scalar target speed (maxSpeed) when input is held,
   // and tmpWish becomes the unit direction. Diagonal input also targets maxSpeed,
   // not maxSpeed*sqrt(2).
