@@ -134,6 +134,15 @@
   #death.show { display: flex; }
   #death h1 { color: #ff5050; font-size: 64px; letter-spacing: 14px; font-weight: 300; }
   #death .sub { color: #ffd0d0; font-size: 13px; letter-spacing: 4px; margin-top: 12px; }
+  #respawnBtn { display: none; margin-top: 28px; padding: 18px 44px; font-family: inherit;
+                font-size: 22px; letter-spacing: 6px; color: #ffb060;
+                background: rgba(0,0,0,0.55); border: 2px solid #ffb060;
+                pointer-events: auto; cursor: pointer; user-select: none;
+                -webkit-tap-highlight-color: transparent; }
+  #respawnBtn:active { background: rgba(255,176,96,0.25); }
+  /* Touch devices: hide keyboard hint, show the button. */
+  body[data-touch] #death .sub { display: none; }
+  body[data-touch] #respawnBtn { display: block; }
 
   /* Pickup hint */
   #pickup { position: fixed; left: 50%; top: 64%; transform: translateX(-50%); color: var(--hud-orange);
@@ -343,7 +352,7 @@
 </div>
 
 <div id="damage"></div>
-<div id="death"><h1>YOU DIED</h1><div class="sub">PRESS R TO RESPAWN</div></div>
+<div id="death"><h1>YOU DIED</h1><div class="sub" id="deathSub">PRESS R TO RESPAWN</div><button id="respawnBtn" type="button">RESPAWN</button></div>
 
 <div id="splash">
   <div id="mobileHint">▸ TAP ANYWHERE TO START · DRAG RIGHT SIDE TO LOOK · LEFT JOYSTICK = MOVE</div>
@@ -1150,6 +1159,16 @@ if (btnNextW)  btnOn(null, btnNextW,  state => {
   }
   switchWeapon(0);
 });
+// Death-screen RESPAWN button (touch): only respawns when actually dead.
+const respawnBtn = document.getElementById('respawnBtn');
+if (respawnBtn) {
+  const tryRespawn = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (!player.alive) respawn();
+  };
+  respawnBtn.addEventListener('click', tryRespawn);
+  respawnBtn.addEventListener('touchend', tryRespawn, { passive: false });
+}
 
 // Force hud resize once after touch class applied (CSS may have changed)
 window.addEventListener('load', () => { cv2.style.display = 'block'; });
