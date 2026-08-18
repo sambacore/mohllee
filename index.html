@@ -799,8 +799,15 @@ function collideMove(pos, vel, dt) {
     for (const c of colliders) {
       if (!overlap({ min: nextMin, max: nextMax }, c)) continue;
       if (axis === 0) {       // X
-        if (vel.x > 0) nextMax[0] = c.min[0]; else nextMin[0] = c.max[0];
-        vel.x = 0; pos.x = (vel.x>0) ? c.min[0]-r-0.001 : c.max[0]+r+0.001;
+        if (vel.x > 0.001) {
+          nextMax[0] = c.min[0]; pos.x = c.min[0] - r - 0.001;
+        } else if (vel.x < -0.001) {
+          nextMin[0] = c.max[0]; pos.x = c.max[0] + r + 0.001;
+        }
+        // else: player is not moving on X — leave X alone. The Y resolver handles
+        // vertical landings (e.g. landing on the ground slab) without shoving the
+        // player out of bounds horizontally.
+        vel.x = 0;
         next.x = pos.x;
         nextMin[0] = pos.x - r; nextMax[0] = pos.x + r;
       } else if (axis === 1) { // Y
@@ -810,8 +817,12 @@ function collideMove(pos, vel, dt) {
         next.y = pos.y;
         nextMin[1] = pos.y; nextMax[1] = pos.y + h;
       } else {                  // Z
-        if (vel.z > 0) nextMax[2] = c.min[2]; else nextMin[2] = c.max[2];
-        vel.z = 0; pos.z = (vel.z>0) ? c.min[2]-r-0.001 : c.max[2]+r+0.001;
+        if (vel.z > 0.001) {
+          nextMax[2] = c.min[2]; pos.z = c.min[2] - r - 0.001;
+        } else if (vel.z < -0.001) {
+          nextMin[2] = c.max[2]; pos.z = c.max[2] + r + 0.001;
+        }
+        vel.z = 0;
         next.z = pos.z;
         nextMin[2] = pos.z - r; nextMax[2] = pos.z + r;
       }
@@ -1139,7 +1150,6 @@ if (btnNextW)  btnOn(null, btnNextW,  state => {
 window.addEventListener('load', () => { cv2.style.display = 'block'; });
 
 // Debug hook — expose state for headless tests / users poking in devtools.
-window.__m = { get player(){return player;}, get inputState(){return inputState;}, get weapons(){return weapons;} };
 
 // ===========================
 // WEAPONS — viewmodel + projectiles
@@ -1671,10 +1681,11 @@ const hpBar = document.getElementById('hpbar');
 const suitBar = document.getElementById('suitbar');
 
 function spawnInitial() {
-  // place player in front of atrium
-  player.pos.set(0, 1.6, -32);
+  // Spawn inside the atrium, just north of the south door, facing the guard at (0, 38).
+  // Walls bound the player on left/right/forward; door behind. A single visible threat.
+  player.pos.set(0, 1.6, 18);
   player.vel.set(0,0,0);
-  player.yaw = Math.PI;             // face +Z (toward atrium)
+  player.yaw = Math.PI;             // face +Z (north, down the atrium toward the guard)
   player.pitch = 0;
   // Give the player a ranged weapon on spawn so they're not stuck with melee only.
   player.weapons[1] = true;         // pistol
@@ -1692,7 +1703,7 @@ function safetyRespawn() {
   if (player.pos.y < -2 ||
       Math.abs(player.pos.x) > 80 || Math.abs(player.pos.z) > 80 ||
       !Number.isFinite(player.pos.x) || !Number.isFinite(player.pos.z)) {
-    player.pos.set(0, 1.6, -32);
+    player.pos.set(0, 1.6, 18);
     player.vel.set(0, 0, 0);
     player.yaw = Math.PI; player.pitch = 0;
     showPickup('OUT OF BOUNDS — RESPAWNED', 1.4);
@@ -1975,7 +1986,7 @@ function respawn() {
   player.hp = player.maxHp;
   player.suit = player.maxSuit;
   player.alive = true;
-  player.pos.set(0, 1.6, -32);
+  player.pos.set(0, 1.6, 18);
   player.vel.set(0,0,0);
   player.yaw = Math.PI;
   document.getElementById('death').classList.remove('show');
