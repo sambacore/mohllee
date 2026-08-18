@@ -1,0 +1,12 @@
+# OS / IDE
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Local test artifacts
+*.log
+*.tmp
+
+# Node (not used here, but harmless)
+node_modules/
