@@ -532,12 +532,15 @@ const LEVEL = {
   wallT: 0.4,
 };
 
-const colliders = [];   // axis-aligned boxes {min, max}
+const colliders = [];   // axis-aligned boxes {min, max, axisMask}
 const triggers = [];    // zones with arbitrary callbacks {kind, ...}
 const pickups = [];     // {pos, kind, taken}
 
-function addBox(minX, minY, minZ, maxX, maxY, maxZ, withShadow = true) {
-  colliders.push({ min: [minX,minY,minZ], max: [maxX,maxY,maxZ] });
+// axisMask bits: 0b001 = X, 0b010 = Y, 0b100 = Z. Default 0b111 = resolve on all axes.
+// Ground slabs use 0b010 (Y only) so the X/Z resolvers don't pin the player to the
+// edge of the giant ground collider every time they try to walk.
+function addBox(minX, minY, minZ, maxX, maxY, maxZ, axisMask = 0b111) {
+  colliders.push({ min: [minX,minY,minZ], max: [maxX,maxY,maxZ], axisMask });
 }
 
 // We build the facility geometry as a single reusable mesh system.
@@ -555,8 +558,8 @@ scene.add(root);
   const mesh = new THREE.Mesh(g, m);
   mesh.receiveShadow = true;
   root.add(mesh);
-  // full ground collider
-  addBox(-LEVEL.bounds, -10, -LEVEL.bounds, LEVEL.bounds, 0, LEVEL.bounds);
+  // full ground collider — Y axis only, otherwise it pins the player to x=±80
+  addBox(-LEVEL.bounds, -10, -LEVEL.bounds, LEVEL.bounds, 0, LEVEL.bounds, 0b010);
 }
 
 // helper: textured wall box
@@ -796,7 +799,9 @@ function collideMove(pos, vel, dt) {
 
   // Resolve in axis order — short axis dependency, fine for our box sizes
   function resolveAxis(axis) {
+    const bit = axis === 0 ? 0b001 : axis === 1 ? 0b010 : 0b100;
     for (const c of colliders) {
+      if (!(c.axisMask & bit)) continue;
       if (!overlap({ min: nextMin, max: nextMax }, c)) continue;
       if (axis === 0) {       // X
         if (vel.x > 0.001) {
