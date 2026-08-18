@@ -878,9 +878,14 @@ function quakeMove(dt, input) {
   let maxSpeed = MOVE.maxSpeed;
   if (input.duck) maxSpeed *= MOVE.maxSpeedDuckMul;
   if (input.sprint) maxSpeed *= 1.25;
-  let wishSpeed = tmpWish.length();
-  if (wishSpeed > 0.001) tmpWish.normalize().multiplyScalar(Math.min(wishSpeed, maxSpeed));
-  wishSpeed = Math.min(wishSpeed, maxSpeed);
+  // Quake-style: wishSpeed is a scalar target speed (maxSpeed) when input is held,
+  // and tmpWish becomes the unit direction. Diagonal input also targets maxSpeed,
+  // not maxSpeed*sqrt(2).
+  let wishSpeed = 0;
+  if (tmpWish.length() > 0.001) {
+    tmpWish.normalize();
+    wishSpeed = maxSpeed;
+  }
 
   // Friction (only horizontal)
   const speed2D = Math.hypot(player.vel.x, player.vel.z);
@@ -892,15 +897,14 @@ function quakeMove(dt, input) {
     }
   }
 
-  // Accelerate in wish direction
+  // Accelerate in wish direction (Quake PM_Accelerate: add accelspeed * unit_wishdir)
   const accel = player.onGround ? MOVE.accelerate : MOVE.airAccelerate;
   const currentSpeed = tmpWish.x * player.vel.x + tmpWish.z * player.vel.z;
   const addSpeed = wishSpeed - currentSpeed;
   if (addSpeed > 0 && wishSpeed > 0.001) {
-    const a = Math.min(accel * wishSpeed * dt, addSpeed);
-    // project wish onto its current direction
-    player.vel.x += tmpWish.x * a / wishSpeed;
-    player.vel.z += tmpWish.z * a / wishSpeed;
+    const accelSpeed = Math.min(accel * wishSpeed * dt, addSpeed);
+    player.vel.x += tmpWish.x * accelSpeed;
+    player.vel.z += tmpWish.z * accelSpeed;
   }
 
   // Gravity
