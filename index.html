@@ -809,12 +809,13 @@ function collideMove(pos, vel, dt) {
 
   const next = pos.clone();
   for (let s = 0; s < subSteps; s++) {
-    // Predict next position
-    const tryX = next.x + vel.x * subDt;
-    const tryY = next.y + vel.y * subDt;
-    const tryZ = next.z + vel.z * subDt;
-    const nextMin = [tryX - r, tryY, tryZ - r];
-    const nextMax = [tryX + r, tryY + h, tryZ + r];
+    // Integrate velocity into position for this sub-step.
+    next.x += vel.x * subDt;
+    next.y += vel.y * subDt;
+    next.z += vel.z * subDt;
+    // AABB for collision check
+    const nextMin = [next.x - r, next.y, next.z - r];
+    const nextMax = [next.x + r, next.y + h, next.z + r];
 
     // Resolve in axis order — short axis dependency, fine for our box sizes
     function resolveAxis(axis, posRef) {
