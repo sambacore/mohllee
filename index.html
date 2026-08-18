@@ -1454,7 +1454,11 @@ function applyDamageEnemy(e, dmg) {
       t += 0.04;
       g.rotation.x = Math.min(Math.PI/2, t*1.5);
       g.position.y = Math.max(start - 0.5, start - t*1.2);
-      g.traverse(o => { if (o.material) o.material.transparent = true; o.material.opacity = Math.max(0, 1 - t*0.6); });
+      g.traverse(o => {
+        if (!o.material) return;
+        o.material.transparent = true;
+        o.material.opacity = Math.max(0, 1 - t*0.6);
+      });
       if (t < 1.6 && g.parent) requestAnimationFrame(drop);
       else { scene.remove(g); }
     };
