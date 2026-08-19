@@ -773,7 +773,7 @@ function weaponKey(i) { return ['pistol','smg','shotgun','rpg'][i-1] || 'pistol'
 // Crowbar = weapon 0, no ammo. Pistol = 1. SMG = 2. Shotgun = 3. RPG = 4.
 
 const MOVE = {
-  maxSpeed: 240,           // u/s — tight facility; Quake stock is 320 but we have small rooms
+  maxSpeed: 180,           // u/s — tight indoor facility (Quake stock 320 is for open arenas)
   accelerate: 10,
   airAccelerate: 10,
   friction: 4,
@@ -886,7 +886,7 @@ function quakeMove(dt, input) {
 
   let maxSpeed = MOVE.maxSpeed;
   if (input.duck) maxSpeed *= MOVE.maxSpeedDuckMul;
-  if (input.sprint) maxSpeed *= 1.4;
+  if (input.sprint) maxSpeed *= 1.15;
   // Quake-style: wishSpeed is a scalar target speed (maxSpeed) when input is held,
   // and tmpWish becomes the unit direction. Diagonal input also targets maxSpeed,
   // not maxSpeed*sqrt(2).
